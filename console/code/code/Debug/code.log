@@ -1,0 +1,2 @@
+﻿  work_json.cpp
+D:\github_mbks2\mbks2\console\code\code\work_json.cpp(9,11): error C2143: синтаксическая ошибка: отсутствие ";" перед "nlohmann::json"
