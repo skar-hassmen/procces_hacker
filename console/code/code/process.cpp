@@ -256,8 +256,103 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
 }
 
 
-int main(void) {
+int setPrivilege(HANDLE hProcess, const char* lpszPrivilege, BOOL bEnablePrivilege) {
+    HANDLE hProcessToken;
+    TOKEN_PRIVILEGES tp;
+    LUID luid;
+    if (OpenProcessToken(hProcess, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hProcessToken)) {
+        if (!LookupPrivilegeValueA(
+            NULL,            // lookup privilege on local system
+            lpszPrivilege,   // privilege to lookup 
+            &luid))        // receives LUID of privilege
+        {
+            printf("LookupPrivilegeValue error: %u\n", GetLastError());
+            return FALSE;
+        }
+
+        tp.PrivilegeCount = 1;
+        tp.Privileges[0].Luid = luid;
+        if (bEnablePrivilege)
+            tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+        else
+            tp.Privileges[0].Attributes = SE_PRIVILEGE_REMOVED;
+
+        if (!AdjustTokenPrivileges(
+            hProcessToken,
+            FALSE,
+            &tp,
+            sizeof(TOKEN_PRIVILEGES),
+            (PTOKEN_PRIVILEGES)NULL,
+            (PDWORD)NULL))
+        {
+            printf("AdjustTokenPrivileges error: %u\n", GetLastError());
+            return FALSE;
+        }
+
+        if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+
+        {
+            printf("The token does not have the specified privilege. \n");
+            return FALSE;
+        }
+
+    }
+    return TRUE;
+}
+void printFileOwner(const char* path)
+{
+    LPSTR lpSid = (LPSTR)"UNKNOWN";
+    PSID psid = NULL;
+    PACL pl = NULL;
+    PSECURITY_DESCRIPTOR pDescr;
+
+    if (!GetNamedSecurityInfoA(path, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &psid, NULL, NULL, NULL, &pDescr))
+    {
+
+        SID_NAME_USE snu;
+        char name[512] = { 0 }, domain[512] = { 0 };
+        DWORD nameLen = 512, domainLen = 512;
+
+        if (LookupAccountSidA(NULL, psid, name, &nameLen, domain, &domainLen, &snu))
+        {
+            ConvertSidToStringSidA(psid, &lpSid);
+
+            printf("Name: %s\n"
+                "Domain: %s\n"
+                "Sid: %s\n",
+                name, domain, lpSid);
+        }
+    }
+    else
+    {
+        printf("Name: ERROR"
+            "Domain: ERROR"
+            "Sid: ERROR");
+    }
+
+    if (pDescr)
+        LocalFree(pDescr);
+    if (lpSid)
+        LocalFree(lpSid);
+}
+
+
+int main(int argc, char* argv[]) {
     nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
     WriteDataToJsonFile(jsonArray);
+    //printFileOwner(argv[2]);
+    if (argc == 5 && std::string(argv[1]) == "--setPrivilege")
+    {
+        HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, atoi(argv[2]));
+        if (hProcess == NULL)
+        {
+            printf("ACCESS DENIED\n");
+            return -1;
+        }
+
+        setPrivilege(hProcess, argv[3], argv[4][0]);
+
+        CloseHandle(hProcess);
+    }
     return 0;
 }
