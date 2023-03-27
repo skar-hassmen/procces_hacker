@@ -256,48 +256,40 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
 }
 
 
-int setPrivilege(HANDLE hProcess, const char* lpszPrivilege, BOOL bEnablePrivilege) {
-    HANDLE hProcessToken;
-    TOKEN_PRIVILEGES tp;
-    LUID luid;
-    if (OpenProcessToken(hProcess, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hProcessToken)) {
-        if (!LookupPrivilegeValueA(
-            NULL,            // lookup privilege on local system
-            lpszPrivilege,   // privilege to lookup 
-            &luid))        // receives LUID of privilege
-        {
-            printf("LookupPrivilegeValue error: %u\n", GetLastError());
-            return FALSE;
-        }
-
-        tp.PrivilegeCount = 1;
-        tp.Privileges[0].Luid = luid;
-        if (bEnablePrivilege)
-            tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
-        else
-            tp.Privileges[0].Attributes = SE_PRIVILEGE_REMOVED;
-
-        if (!AdjustTokenPrivileges(
-            hProcessToken,
-            FALSE,
-            &tp,
-            sizeof(TOKEN_PRIVILEGES),
-            (PTOKEN_PRIVILEGES)NULL,
-            (PDWORD)NULL))
-        {
-            printf("AdjustTokenPrivileges error: %u\n", GetLastError());
-            return FALSE;
-        }
-
-        if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
-
-        {
-            printf("The token does not have the specified privilege. \n");
-            return FALSE;
-        }
-
+int setPrivilege(HANDLE processHandle, char* selectedPrivilege, bool isEnabling) {
+    HANDLE hToken = NULL;
+    if (!OpenProcessToken(processHandle, TOKEN_ADJUST_PRIVILEGES, &hToken))
+    {
+        return 0;
     }
-    return TRUE;
+
+    LUID luid;
+    if (!LookupPrivilegeValueA(NULL, selectedPrivilege, &luid))
+    {
+        return 0;
+    }
+
+    TOKEN_PRIVILEGES pToken;
+    pToken.PrivilegeCount = 1;
+    pToken.Privileges[0].Luid = luid;
+    if (isEnabling)
+    {
+        pToken.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    }
+    else
+    {
+        pToken.Privileges[0].Attributes = 0;
+    }
+
+    if (!AdjustTokenPrivileges(hToken, FALSE, &pToken, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL))
+    {
+        return 0;
+    }
+
+    if (hToken)
+    {
+        CloseHandle(hToken);
+    }
 }
 void printFileOwner(const char* path)
 {
@@ -350,7 +342,8 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
-        setPrivilege(hProcess, argv[3], argv[4][0]);
+        setPrivilege(hProcess, argv[3], argv[4][0] == '1');
+        //setPrivilege(argv[3], hProcess, argv[4][0]);
 
         CloseHandle(hProcess);
     }
