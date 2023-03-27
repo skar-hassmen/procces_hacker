@@ -329,11 +329,42 @@ void printFileOwner(const char* path)
 }
 
 
+void setFileOwner(const char* path, const char* user)
+{
+    char cmd[256] = { 0 };
+    strcat(cmd, "takeown /F \"");
+    strcat(cmd, path);
+    strcat(cmd, "\"");
+
+
+    if (!strcmp(user, "OWNER")) {
+        strcat(cmd, " /A");
+        system(cmd);
+    }
+    else if (!strcmp(user, "CURRENT"))
+    {
+        system(cmd);
+    }
+    else
+    {
+        printf("WRONG ARGS\n");
+        return;
+    }
+}
+
+
 int main(int argc, char* argv[]) {
     nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
     WriteDataToJsonFile(jsonArray);
-    //printFileOwner(argv[2]);
-    if (argc == 5 && std::string(argv[1]) == "--setPrivilege")
+    if (argc == 4 && std::string(argv[1]) == "--setFileOwner") 
+    {
+        setFileOwner(argv[2], argv[3]);
+    }
+    else if (argc == 3 && std::string(argv[1]) == "--printFileOwner")
+    {
+        printFileOwner(argv[2]);
+    }
+    else if (argc == 5 && std::string(argv[1]) == "--setPrivilege")
     {
         HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, atoi(argv[2]));
         if (hProcess == NULL)
