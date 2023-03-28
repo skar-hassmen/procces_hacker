@@ -19,3 +19,12 @@ NAMES_FOR_SERIALIZER_TABLE = [
     ]
 
 PATH_MEDIA_FILES = "./../media"
+
+NAMES_ADDITIONAL_INFO = [
+        'path_exe',
+        'ASLR_EnableBottomUpRandomization',
+        'ASLR_EnableForceRelocateImages',
+        'ASLR_EnableHighEntropy',
+        'list_dll',
+        'privileges'
+]
