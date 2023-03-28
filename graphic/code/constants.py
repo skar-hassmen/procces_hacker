@@ -28,3 +28,10 @@ NAMES_ADDITIONAL_INFO = [
         'list_dll',
         'privileges'
 ]
+
+COLUMN_ADDITIONAL_TABLE = [
+        'Path exe',
+        'ASLR\nEnableBottomUpRandomization',
+        'ASLR\nEnableForceRelocateImages',
+        'ASLR\nEnableHighEntropy'
+]

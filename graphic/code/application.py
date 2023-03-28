@@ -1,90 +1,95 @@
 import sys
 import pandas as pd
 
-from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtGui import QStandardItemModel, QStandardItem, QIcon
-from PyQt5.QtWidgets import QMainWindow, QApplication, QVBoxLayout, QListView, QWidget, QTableView, QMenu, QAction, \
-    qApp, QLabel, QListWidget
+from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtGui import QIcon
+from PyQt5.QtWidgets import QMainWindow, QApplication, QAction
 from PyQt5.QtCore import Qt
 
 from DataBase import DataBase
-from constants import COLUMNS, PATH_MEDIA_FILES
+from constants import COLUMNS, PATH_MEDIA_FILES, COLUMN_ADDITIONAL_TABLE
 from serializers import serialize_data_for_table, serialize_additional_info
 
 
-class AdditionalWindow(QWidget):
-    def __init__(self, name_process):
+class AdditionalWindow(QMainWindow):
+    def __init__(self, name_process, json_file, index):
         super(AdditionalWindow, self).__init__()
-        self.setWindowTitle(name_process)
+        self.name_process = name_process
+        self.json_file = json_file
+        self.index = index
+        self.data_process = None
+        self.setupUi()
+
+    def setupUi(self):
+        self.data_process = serialize_additional_info(self.json_file, self.index)
+
+        self.setWindowTitle(self.name_process)
         self.setGeometry(300, 250, 800, 600)
         icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
         self.setWindowIcon(icon)
-        self.mainlayout = QVBoxLayout()
-        self.setLayout(self.mainlayout)
+        self.setEnabled(True)
+        self.resize(800, 600)
+        self.centralwidget = QtWidgets.QWidget(self)
+        self.centralwidget.setObjectName("centralwidget")
+        self.verticalLayoutWidget = QtWidgets.QWidget(self.centralwidget)
+        self.verticalLayoutWidget.setGeometry(QtCore.QRect(0, 0, 801, 601))
+        self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
+        self.verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
+        self.verticalLayout.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout.setObjectName("verticalLayout")
+        self.additional_table = QtWidgets.QTableView(self.verticalLayoutWidget)
+        self.additional_table.setFixedSize(800, 90)
 
-    def create_additional_info(self, json_array, index):
-        data_process = serialize_additional_info(json_array, index)
+        header = self.additional_table.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
 
-        path_exe = QLabel(self)
-        path_exe.setText(f"Path exe: {data_process[0]}")
-        path_exe.move(50, 50)
-        path_exe.adjustSize()
+        additional_info = [self.data_process[0], self.data_process[1], self.data_process[2], self.data_process[3]]
+        data_table = pd.DataFrame([additional_info], columns=COLUMN_ADDITIONAL_TABLE, index=[1])
 
-        ASLR_EnableBottomUpRandomization = QLabel(self)
-        ASLR_EnableBottomUpRandomization.setText(f"ASLR EnableBottomUpRandomization: {data_process[1]}")
-        ASLR_EnableBottomUpRandomization.move(50, 70)
-        ASLR_EnableBottomUpRandomization.adjustSize()
+        model_table = TableModel(data_table)
+        self.additional_table.setModel(model_table)
 
-        ASLR_EnableForceRelocateImages = QLabel(self)
-        ASLR_EnableForceRelocateImages.setText(f"ASLR EnableForceRelocateImages: {data_process[2]}")
-        ASLR_EnableForceRelocateImages.move(50, 90)
-        ASLR_EnableForceRelocateImages.adjustSize()
+        self.additional_table.setObjectName("additional_table")
+        self.verticalLayout.addWidget(self.additional_table)
+        self.list_dll = QtWidgets.QListWidget(self.verticalLayoutWidget)
 
-        ASLR_EnableHighEntropy = QLabel(self)
-        ASLR_EnableHighEntropy.setText(f"ASLR EnableHighEntropy: {data_process[3]}")
-        ASLR_EnableHighEntropy.move(50, 110)
-        ASLR_EnableHighEntropy.adjustSize()
+        self.list_dll.setObjectName("list_dll")
+        for _ in self.data_process[4]:
+            item = QtWidgets.QListWidgetItem()
+            self.list_dll.addItem(item)
 
-        dll_list = QLabel(self)
-        dll_list.setText(f"DLL: ")
-        dll_list.move(50, 130)
-        dll_list.adjustSize()
+        self.verticalLayout.addWidget(self.list_dll)
+        self.list_privileges = QtWidgets.QListWidget(self.verticalLayoutWidget)
+        self.list_privileges.setObjectName("list_privileges")
 
+        for _ in self.data_process[5]:
+            item = QtWidgets.QListWidgetItem()
+            self.list_privileges.addItem(item)
 
-        n = 0
-        if data_process[5] == "No data":
-            ASLR_EnableHighEntropy = QLabel(self)
-            ASLR_EnableHighEntropy.setText("No data")
-            ASLR_EnableHighEntropy.move(50, 140)
-            n += 10
-            ASLR_EnableHighEntropy.adjustSize()
-        else:
-            for elem in data_process[4]:
-                n += 10
-                ASLR_EnableHighEntropy = QLabel(self)
-                ASLR_EnableHighEntropy.setText(f"{elem}")
-                ASLR_EnableHighEntropy.move(50, 130 + n)
-                ASLR_EnableHighEntropy.adjustSize()
+        self.verticalLayout.addWidget(self.list_privileges)
+        self.setCentralWidget(self.centralwidget)
 
-        dll_list = QLabel(self)
-        dll_list.setText(f"Privileges: ")
-        dll_list.move(50, 130 + n + 10)
-        dll_list.adjustSize()
+        self.retranslateUi()
+        QtCore.QMetaObject.connectSlotsByName(self)
 
-        m = 0
-        if data_process[5] == "No data":
-            ASLR_EnableHighEntropy = QLabel(self)
-            ASLR_EnableHighEntropy.setText("No data")
-            ASLR_EnableHighEntropy.move(50, 130 + n + m + 10 + 10)
-            ASLR_EnableHighEntropy.adjustSize()
-        else:
-            for elem in data_process[5]:
-                m += 10
-                ASLR_EnableHighEntropy = QLabel(self)
-                ASLR_EnableHighEntropy.setText(f"{elem}")
-                ASLR_EnableHighEntropy.move(50, 130 + n + m + 10)
-                ASLR_EnableHighEntropy.adjustSize()
+    def retranslateUi(self):
+        _translate = QtCore.QCoreApplication.translate
+        __sortingEnabled = self.list_dll.isSortingEnabled()
+        self.list_dll.setSortingEnabled(False)
 
+        for ind, elem in enumerate(self.data_process[4]):
+            item = self.list_dll.item(ind)
+            item.setText(elem)
+
+        self.list_dll.setSortingEnabled(__sortingEnabled)
+        __sortingEnabled = self.list_privileges.isSortingEnabled()
+        self.list_privileges.setSortingEnabled(False)
+
+        for ind, elem in enumerate(self.data_process[5]):
+            item = self.list_privileges.item(ind)
+            item.setText(elem)
+
+        self.list_privileges.setSortingEnabled(__sortingEnabled)
 
 
 class MyTableView(QtWidgets.QTableView):
@@ -95,10 +100,9 @@ class MyTableView(QtWidgets.QTableView):
     def mouseDoubleClickEvent(self, event):
         index = self.currentIndex().siblingAtColumn(0)
         name_process = index.data()
-        self.additional_window = AdditionalWindow(name_process)
-        self.additional_window.create_additional_info(self.main_window.db.json_array, index.row())
+
+        self.additional_window = AdditionalWindow(name_process, self.main_window.db.json_array, index.row())
         self.additional_window.show()
-        print(index.row())
 
 
 class TableModel(QtCore.QAbstractTableModel):
@@ -144,6 +148,9 @@ class Window(QMainWindow):
         data_process = serialize_data_for_table(self.db.json_array)
         count_process = len(data_process)
         data_table = pd.DataFrame(data_process, columns=COLUMNS, index=[str(i) for i in range(1, count_process + 1)])
+
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
 
         model_table = TableModel(data_table)
         self.table.setModel(model_table)
