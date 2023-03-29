@@ -7,8 +7,9 @@ from PyQt5.QtWidgets import QMainWindow, QApplication, QAction
 from PyQt5.QtCore import Qt
 
 from DataBase import DataBase
-from constants import COLUMNS, PATH_MEDIA_FILES, COLUMN_ADDITIONAL_TABLE
-from serializers import serialize_data_for_table, serialize_additional_info
+from constants import COLUMNS, PATH_MEDIA_FILES, COLUMNS_ADDITIONAL_TABLE, COLUMN_DLL, COLUMN_PRIVILEGES
+from serializers import serialize_data_for_table, serialize_additional_info, serialize_list_dlls, \
+    serialize_list_privileges
 
 
 class AdditionalWindow(QMainWindow):
@@ -17,79 +18,110 @@ class AdditionalWindow(QMainWindow):
         self.name_process = name_process
         self.json_file = json_file
         self.index = index
-        self.data_process = None
         self.setupUi()
 
     def setupUi(self):
-        self.data_process = serialize_additional_info(self.json_file, self.index)
-
         self.setWindowTitle(self.name_process)
-        self.setGeometry(300, 250, 800, 600)
+        width = 700
+        height = 750
+        self.setGeometry(300, 250, width, height)
         icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
         self.setWindowIcon(icon)
         self.setEnabled(True)
-        self.resize(800, 600)
         self.centralwidget = QtWidgets.QWidget(self)
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayoutWidget = QtWidgets.QWidget(self.centralwidget)
-        self.verticalLayoutWidget.setGeometry(QtCore.QRect(0, 0, 801, 601))
+        self.verticalLayoutWidget.setGeometry(QtCore.QRect(0, 0, width, height))
         self.verticalLayoutWidget.setObjectName("verticalLayoutWidget")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.verticalLayoutWidget)
         self.verticalLayout.setContentsMargins(0, 0, 0, 0)
         self.verticalLayout.setObjectName("verticalLayout")
+
+        self.create_table_with_additional_info()
+        self.create_table_with_dlls()
+        self.create_table_with_privileges()
+
+        self.setCentralWidget(self.centralwidget)
+
+        QtCore.QMetaObject.connectSlotsByName(self)
+
+    def create_table_with_additional_info(self):
         self.additional_table = QtWidgets.QTableView(self.verticalLayoutWidget)
-        self.additional_table.setFixedSize(800, 90)
 
-        header = self.additional_table.horizontalHeader()
-        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+        self.additional_table.setStyleSheet(
+            """
+            background-color: #ffdea1;
+            """
+        )
 
-        additional_info = [self.data_process[0], self.data_process[1], self.data_process[2], self.data_process[3]]
-        data_table = pd.DataFrame([additional_info], columns=COLUMN_ADDITIONAL_TABLE, index=[1])
+        additional_info = serialize_additional_info(self.json_file, self.index)
+        count_process = len(additional_info)
+        data_table = pd.DataFrame(additional_info, columns=COLUMNS_ADDITIONAL_TABLE,
+                                  index=[str(i) for i in range(1, count_process + 1)])
+
+        header_h = self.additional_table.horizontalHeader()
+        header_h.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+
+        header_v = self.additional_table.verticalHeader()
+        header_v.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
 
         model_table = TableModel(data_table)
         self.additional_table.setModel(model_table)
 
         self.additional_table.setObjectName("additional_table")
         self.verticalLayout.addWidget(self.additional_table)
-        self.list_dll = QtWidgets.QListWidget(self.verticalLayoutWidget)
 
-        self.list_dll.setObjectName("list_dll")
-        for _ in self.data_process[4]:
-            item = QtWidgets.QListWidgetItem()
-            self.list_dll.addItem(item)
+    def create_table_with_dlls(self):
+        self.dlls_table = QtWidgets.QTableView(self.verticalLayoutWidget)
 
-        self.verticalLayout.addWidget(self.list_dll)
-        self.list_privileges = QtWidgets.QListWidget(self.verticalLayoutWidget)
-        self.list_privileges.setObjectName("list_privileges")
+        self.dlls_table.setStyleSheet(
+            """
+            background-color: #ffdea1;
+            """
+        )
 
-        for _ in self.data_process[5]:
-            item = QtWidgets.QListWidgetItem()
-            self.list_privileges.addItem(item)
+        dlls_info = serialize_list_dlls(self.json_file, self.index)
+        count_dll = len(dlls_info)
+        data_table = pd.DataFrame(dlls_info, columns=COLUMN_DLL,
+                                  index=[str(i) for i in range(1, count_dll + 1)])
 
-        self.verticalLayout.addWidget(self.list_privileges)
-        self.setCentralWidget(self.centralwidget)
+        header_h = self.dlls_table.horizontalHeader()
+        header_h.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
 
-        self.retranslateUi()
-        QtCore.QMetaObject.connectSlotsByName(self)
+        header_v = self.dlls_table.verticalHeader()
+        header_v.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
 
-    def retranslateUi(self):
-        _translate = QtCore.QCoreApplication.translate
-        __sortingEnabled = self.list_dll.isSortingEnabled()
-        self.list_dll.setSortingEnabled(False)
+        model_table = TableModel(data_table)
+        self.dlls_table.setModel(model_table)
 
-        for ind, elem in enumerate(self.data_process[4]):
-            item = self.list_dll.item(ind)
-            item.setText(elem)
+        self.dlls_table.setObjectName("dlls_table")
+        self.verticalLayout.addWidget(self.dlls_table)
 
-        self.list_dll.setSortingEnabled(__sortingEnabled)
-        __sortingEnabled = self.list_privileges.isSortingEnabled()
-        self.list_privileges.setSortingEnabled(False)
+    def create_table_with_privileges(self):
+        self.privileges_table = QtWidgets.QTableView(self.verticalLayoutWidget)
 
-        for ind, elem in enumerate(self.data_process[5]):
-            item = self.list_privileges.item(ind)
-            item.setText(elem)
+        self.privileges_table.setStyleSheet(
+            """
+            background-color: #ffdea1;
+            """
+        )
 
-        self.list_privileges.setSortingEnabled(__sortingEnabled)
+        privileges_info = serialize_list_privileges(self.json_file, self.index)
+        count_privileges = len(privileges_info)
+        data_table = pd.DataFrame(privileges_info, columns=COLUMN_PRIVILEGES,
+                                  index=[str(i) for i in range(1, count_privileges + 1)])
+
+        header_h = self.privileges_table.horizontalHeader()
+        header_h.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+
+        header_v = self.privileges_table.verticalHeader()
+        header_v.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+
+        model_table = TableModel(data_table)
+        self.privileges_table.setModel(model_table)
+
+        self.privileges_table.setObjectName("privileges_table")
+        self.verticalLayout.addWidget(self.privileges_table)
 
 
 class MyTableView(QtWidgets.QTableView):
@@ -124,6 +156,7 @@ class TableModel(QtCore.QAbstractTableModel):
 
     def headerData(self, section, orientation, role):
         if role == Qt.DisplayRole:
+
             if orientation == Qt.Horizontal:
                 return str(self._data.columns[section])
 
@@ -145,14 +178,24 @@ class Window(QMainWindow):
     def create_table(self):
         self.table = MyTableView(self)
 
+        self.table.setStyleSheet(
+            """
+            background-color: #ffdea1;
+            """
+        )
+
         data_process = serialize_data_for_table(self.db.json_array)
         count_process = len(data_process)
         data_table = pd.DataFrame(data_process, columns=COLUMNS, index=[str(i) for i in range(1, count_process + 1)])
 
-        header = self.table.horizontalHeader()
-        header.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
-
         model_table = TableModel(data_table)
+
+        header_h = self.table.horizontalHeader()
+        header_h.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+
+        header_v = self.table.verticalHeader()
+        header_v.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+
         self.table.setModel(model_table)
         self.setCentralWidget(self.table)
 
@@ -161,14 +204,22 @@ class Window(QMainWindow):
         refresh_action.setShortcut('Ctrl+U')
         refresh_action.triggered.connect(self.refresh_table)
 
+        file_owner_action = QAction('&Сhange File Owner', self)
+        file_owner_action.setShortcut('Ctrl+O')
+        file_owner_action.triggered.connect(self.change_file_owner)
+
         menu_bar = self.menuBar()
         menu_bar.addAction(refresh_action)
+
+        action_menu = menu_bar.addMenu("&Action")
+        action_menu.addAction(file_owner_action)
 
     def refresh_table(self):
         self.db.update_process_information()
         self.create_table()
 
-
+    def change_file_owner(self):
+        print("777")
 
 
 def application():
