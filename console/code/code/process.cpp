@@ -441,8 +441,7 @@ void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
 
     HANDLE hToken;
 
-    if (!CreateWellKnownSid(integritySID, 0, tml.Label.Sid, &cb) ||
-        !OpenProcessToken(hProcess, TOKEN_ADJUST_DEFAULT, &hToken))
+    if (!CreateWellKnownSid(integritySID, 0, tml.Label.Sid, &cb) ||!OpenProcessToken(hProcess, TOKEN_ADJUST_DEFAULT, &hToken))
     {
         std::cout << GetLastError();
         return;
@@ -457,7 +456,48 @@ void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
     CloseHandle(hToken);
 
 }
+void printFileIntegrityLevel(const char* path)
+{
+    DWORD integrityLevel = SECURITY_MANDATORY_UNTRUSTED_RID;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+    PACL acl = 0;
 
+    if (!GetNamedSecurityInfoA(path, SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION, 0, 0, 0, &acl, &pSD))
+    {
+        if (0 != acl && 0 < acl->AceCount)
+        {
+            SYSTEM_MANDATORY_LABEL_ACE* ace = 0;
+            if (GetAce(acl, 0, reinterpret_cast<void**>(&ace)))
+            {
+                SID* sid = reinterpret_cast<SID*>(&ace->SidStart);
+                integrityLevel = sid->SubAuthority[0];
+            }
+        }
+
+        PWSTR stringSD;
+        ULONG stringSDLen = 0;
+
+        ConvertSecurityDescriptorToStringSecurityDescriptor(pSD, SDDL_REVISION_1, LABEL_SECURITY_INFORMATION, &stringSD, &stringSDLen);
+
+        if (integrityLevel == 4096)
+            printf("Low\n");
+        else if (integrityLevel == 8192)
+            printf("Medium\n");
+        else if (integrityLevel == 12288)
+            printf("High\n");
+        else
+            printf("UNKNOWN\n");
+
+        if (pSD)
+        {
+            LocalFree(pSD);
+        }
+    }
+    else
+    {
+        printf("ACCESS DENIED\n");
+    }
+}
 int main(int argc, char* argv[]) {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
@@ -496,6 +536,9 @@ int main(int argc, char* argv[]) {
     else if (argc == 4 && std::string(argv[1]) == "--setIntegrity")
     {
         setIntegrityLevel(atoi(argv[2]), std::string(argv[3]));
+    }
+    else if (argc == 3 && std::string(argv[1]) == "--printFileIntegrityLevel") {
+        printFileIntegrityLevel(argv[2]);
     }
     return 0;
 }
