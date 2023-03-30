@@ -41,9 +41,9 @@ void WriteDataToJsonFile(nlohmann::json jsonArray) {
 }
 
 
-std::vector<std::string> CheckPrivilege(HANDLE hProcess) {
+std::vector<std::vector<std::string>> CheckPrivilege(HANDLE hProcess) {
     LUID luid;
-    std::vector<std::string> privileges;
+    std::vector<std::vector<std::string>> privileges;
     PRIVILEGE_SET privs;
     HANDLE hProcessToken;
     if (OpenProcessToken(hProcess, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hProcessToken)) {
@@ -52,12 +52,15 @@ std::vector<std::string> CheckPrivilege(HANDLE hProcess) {
             TOKEN_PRIVILEGES* data = (TOKEN_PRIVILEGES*)GlobalAlloc(GPTR, data_length);
             if (GetTokenInformation(hProcessToken, TokenPrivileges, data, data_length, &data_length)) {
                 for (int i = 0; i < data->PrivilegeCount; ++i) {
+                    std::vector<std::string> tmp;
                     std::wstring priv;
                     WCHAR pname[128];
                     DWORD dwSize = 128;
                     LookupPrivilegeName(NULL, &data->Privileges[i].Luid, pname, &dwSize);
                     priv += pname;
-                    privileges.push_back(utf8_encode(priv));
+                    tmp.push_back(utf8_encode(priv));
+                    tmp.push_back(std::to_string(data->Privileges[i].Attributes));
+                    privileges.push_back(tmp);
                 }
             }
         }
@@ -231,12 +234,17 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
         if (INVALID_HANDLE_VALUE != mSnapshot) {
             meModuleEntry.dwSize = sizeof(MODULEENTRY32);
             Module32First(mSnapshot, &meModuleEntry);
+            int Biba=0;
             do {
                 if (wcscmp(meModuleEntry.szModule, L"mscoree.dll") == 0) isDotNet = TRUE;
                 std::wstring dll;
                 for (int i = 0; meModuleEntry.szModule[i] != 0x00; ++i) dll += meModuleEntry.szModule[i];
                 std::string dll_string = utf8_encode(dll);
-                dlls.push_back(dll_string);
+                if (Biba == 0) 
+                {
+                    Biba = 1;
+                }
+                else dlls.push_back(dll_string);
 
             } while (Module32Next(mSnapshot, &meModuleEntry));
 
@@ -451,8 +459,15 @@ void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
 }
 
 int main(int argc, char* argv[]) {
-    nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
-    WriteDataToJsonFile(jsonArray);
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
+   // nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
+    //WriteDataToJsonFile(jsonArray);
+    if (argc == 2 && std::string(argv[1]) == "--update")
+    {
+        nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
+        WriteDataToJsonFile(jsonArray);
+    }
     if (argc == 4 && std::string(argv[1]) == "--setFileOwner") 
     {
         setFileOwner(argv[2], argv[3]);
