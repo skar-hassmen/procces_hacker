@@ -394,6 +394,62 @@ void setFileIntegrityLevel(const char* path, const char* level)
 
 }
 
+void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, pid);
+    if (hProcess == NULL)
+    {
+        printf("ACCESS DENIED\n");
+    }
+
+    WELL_KNOWN_SID_TYPE integritySID;
+
+    if (integrityLevel == "UNTRUSTED")
+    {
+        integritySID = WinUntrustedLabelSid;
+
+    }
+    else if (integrityLevel == "LOW")
+    {
+        integritySID = WinLowLabelSid;
+    }
+    else if (integrityLevel == "MEDIUM")
+    {
+        integritySID = WinMediumLabelSid;
+    }
+    else if (integrityLevel == "HIGH")
+    {
+        integritySID = WinHighLabelSid;
+    }
+    else
+    {
+        std::cout << "UNKNOWN COMMAND!" << std::endl;
+        return;
+    }
+
+
+    TOKEN_MANDATORY_LABEL tml = { { (PSID)alloca(MAX_SID_SIZE), SE_GROUP_INTEGRITY } };
+
+    ULONG cb = MAX_SID_SIZE;
+
+    HANDLE hToken;
+
+    if (!CreateWellKnownSid(integritySID, 0, tml.Label.Sid, &cb) ||
+        !OpenProcessToken(hProcess, TOKEN_ADJUST_DEFAULT, &hToken))
+    {
+        std::cout << GetLastError();
+        return;
+    }
+
+    ULONG dwError = NOERROR;
+    if (!SetTokenInformation(hToken, TokenIntegrityLevel, &tml, sizeof(tml)))
+    {
+        std::cout << GetLastError();
+    }
+
+    CloseHandle(hToken);
+
+}
+
 int main(int argc, char* argv[]) {
     nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
     WriteDataToJsonFile(jsonArray);
@@ -418,6 +474,13 @@ int main(int argc, char* argv[]) {
         //setPrivilege(argv[3], hProcess, argv[4][0]);
 
         CloseHandle(hProcess);
+    }
+    else if (argc == 4 && std::string(argv[1]) == "--setFileIntegrityLevel") {
+        setFileIntegrityLevel(argv[2], argv[3]);
+    }
+    else if (argc == 4 && std::string(argv[1]) == "--setIntegrity")
+    {
+        setIntegrityLevel(atoi(argv[2]), std::string(argv[3]));
     }
     return 0;
 }
