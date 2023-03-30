@@ -352,6 +352,47 @@ void setFileOwner(const char* path, const char* user)
     }
 }
 
+void setFileIntegrityLevel(const char* path, const char* level)
+{
+    DWORD dwErr = ERROR_SUCCESS;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+
+    PACL pSacl = NULL; // not allocated
+    BOOL fSaclPresent = FALSE;
+    BOOL fSaclDefaulted = FALSE;
+    LPCWSTR sddl;
+
+    if (!strcmp(level, "LOW"))
+        sddl = L"S:AI(ML;;NW;;;LW)";
+    else if (!strcmp(level, "MEDIUM"))
+        sddl = L"S:AI(ML;;NW;;;ME)";
+    else if (!strcmp(level, "HIGH"))
+        sddl = L"S:AI(ML;;NW;;;HI)";
+    else return;
+
+    if (ConvertStringSecurityDescriptorToSecurityDescriptorW(
+        sddl, SDDL_REVISION_1, &pSD, NULL))
+    {
+        if (GetSecurityDescriptorSacl(pSD, &fSaclPresent, &pSacl,
+            &fSaclDefaulted))
+        {
+            // Note that psidOwner, psidGroup, and pDacl are 
+            // all NULL and set the new LABEL_SECURITY_INFORMATION
+            if (!SetNamedSecurityInfoA((char*)path,
+                SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION,
+                NULL, NULL, NULL, pSacl))
+            {
+                printf("SUCCESS\n");
+            }
+            else
+            {
+                printf("ACCESS DENIED\n");
+            }
+        }
+        LocalFree(pSD);
+    }
+
+}
 
 int main(int argc, char* argv[]) {
     nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
