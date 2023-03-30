@@ -41,9 +41,9 @@ void WriteDataToJsonFile(nlohmann::json jsonArray) {
 }
 
 
-std::vector<std::string> CheckPrivilege(HANDLE hProcess) {
+std::vector<std::vector<std::string>> CheckPrivilege(HANDLE hProcess) {
     LUID luid;
-    std::vector<std::string> privileges;
+    std::vector<std::vector<std::string>> privileges;
     PRIVILEGE_SET privs;
     HANDLE hProcessToken;
     if (OpenProcessToken(hProcess, TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &hProcessToken)) {
@@ -52,12 +52,15 @@ std::vector<std::string> CheckPrivilege(HANDLE hProcess) {
             TOKEN_PRIVILEGES* data = (TOKEN_PRIVILEGES*)GlobalAlloc(GPTR, data_length);
             if (GetTokenInformation(hProcessToken, TokenPrivileges, data, data_length, &data_length)) {
                 for (int i = 0; i < data->PrivilegeCount; ++i) {
+                    std::vector<std::string> tmp;
                     std::wstring priv;
                     WCHAR pname[128];
                     DWORD dwSize = 128;
                     LookupPrivilegeName(NULL, &data->Privileges[i].Luid, pname, &dwSize);
                     priv += pname;
-                    privileges.push_back(utf8_encode(priv));
+                    tmp.push_back(utf8_encode(priv));
+                    tmp.push_back(std::to_string(data->Privileges[i].Attributes));
+                    privileges.push_back(tmp);
                 }
             }
         }
@@ -231,12 +234,17 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
         if (INVALID_HANDLE_VALUE != mSnapshot) {
             meModuleEntry.dwSize = sizeof(MODULEENTRY32);
             Module32First(mSnapshot, &meModuleEntry);
+            int Biba=0;
             do {
                 if (wcscmp(meModuleEntry.szModule, L"mscoree.dll") == 0) isDotNet = TRUE;
                 std::wstring dll;
                 for (int i = 0; meModuleEntry.szModule[i] != 0x00; ++i) dll += meModuleEntry.szModule[i];
                 std::string dll_string = utf8_encode(dll);
-                dlls.push_back(dll_string);
+                if (Biba == 0) 
+                {
+                    Biba = 1;
+                }
+                else dlls.push_back(dll_string);
 
             } while (Module32Next(mSnapshot, &meModuleEntry));
 
@@ -256,8 +264,238 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
 }
 
 
-int main(void) {
-    nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
-    WriteDataToJsonFile(jsonArray);
+int setPrivilege(HANDLE processHandle, char* selectedPrivilege, bool isEnabling) {
+    HANDLE hToken = NULL;
+    if (!OpenProcessToken(processHandle, TOKEN_ADJUST_PRIVILEGES, &hToken))
+    {
+        return 0;
+    }
+
+    LUID luid;
+    if (!LookupPrivilegeValueA(NULL, selectedPrivilege, &luid))
+    {
+        return 0;
+    }
+
+    TOKEN_PRIVILEGES pToken;
+    pToken.PrivilegeCount = 1;
+    pToken.Privileges[0].Luid = luid;
+    if (isEnabling)
+    {
+        pToken.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+    }
+    else
+    {
+        pToken.Privileges[0].Attributes = 0;
+    }
+
+    if (!AdjustTokenPrivileges(hToken, FALSE, &pToken, sizeof(TOKEN_PRIVILEGES), (PTOKEN_PRIVILEGES)NULL, (PDWORD)NULL))
+    {
+        return 0;
+    }
+
+    if (hToken)
+    {
+        CloseHandle(hToken);
+    }
+}
+void printFileOwner(const char* path)
+{
+    LPSTR lpSid = (LPSTR)"UNKNOWN";
+    PSID psid = NULL;
+    PACL pl = NULL;
+    PSECURITY_DESCRIPTOR pDescr;
+
+    if (!GetNamedSecurityInfoA(path, SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, &psid, NULL, NULL, NULL, &pDescr))
+    {
+
+        SID_NAME_USE snu;
+        char name[512] = { 0 }, domain[512] = { 0 };
+        DWORD nameLen = 512, domainLen = 512;
+
+        if (LookupAccountSidA(NULL, psid, name, &nameLen, domain, &domainLen, &snu))
+        {
+            ConvertSidToStringSidA(psid, &lpSid);
+
+            printf("Name: %s\n"
+                "Domain: %s\n"
+                "Sid: %s\n",
+                name, domain, lpSid);
+        }
+    }
+    else
+    {
+        printf("Name: ERROR"
+            "Domain: ERROR"
+            "Sid: ERROR");
+    }
+
+    if (pDescr)
+        LocalFree(pDescr);
+    if (lpSid)
+        LocalFree(lpSid);
+}
+
+
+void setFileOwner(const char* path, const char* user)
+{
+    char cmd[256] = { 0 };
+    strcat(cmd, "takeown /F \"");
+    strcat(cmd, path);
+    strcat(cmd, "\"");
+
+
+    if (!strcmp(user, "OWNER")) {
+        strcat(cmd, " /A");
+        system(cmd);
+    }
+    else if (!strcmp(user, "CURRENT"))
+    {
+        system(cmd);
+    }
+    else
+    {
+        printf("WRONG ARGS\n");
+        return;
+    }
+}
+
+void setFileIntegrityLevel(const char* path, const char* level)
+{
+    DWORD dwErr = ERROR_SUCCESS;
+    PSECURITY_DESCRIPTOR pSD = NULL;
+
+    PACL pSacl = NULL; // not allocated
+    BOOL fSaclPresent = FALSE;
+    BOOL fSaclDefaulted = FALSE;
+    LPCWSTR sddl;
+
+    if (!strcmp(level, "LOW"))
+        sddl = L"S:AI(ML;;NW;;;LW)";
+    else if (!strcmp(level, "MEDIUM"))
+        sddl = L"S:AI(ML;;NW;;;ME)";
+    else if (!strcmp(level, "HIGH"))
+        sddl = L"S:AI(ML;;NW;;;HI)";
+    else return;
+
+    if (ConvertStringSecurityDescriptorToSecurityDescriptorW(
+        sddl, SDDL_REVISION_1, &pSD, NULL))
+    {
+        if (GetSecurityDescriptorSacl(pSD, &fSaclPresent, &pSacl,
+            &fSaclDefaulted))
+        {
+            // Note that psidOwner, psidGroup, and pDacl are 
+            // all NULL and set the new LABEL_SECURITY_INFORMATION
+            if (!SetNamedSecurityInfoA((char*)path,
+                SE_FILE_OBJECT, LABEL_SECURITY_INFORMATION,
+                NULL, NULL, NULL, pSacl))
+            {
+                printf("SUCCESS\n");
+            }
+            else
+            {
+                printf("ACCESS DENIED\n");
+            }
+        }
+        LocalFree(pSD);
+    }
+
+}
+
+void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
+    HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, pid);
+    if (hProcess == NULL)
+    {
+        printf("ACCESS DENIED\n");
+    }
+
+    WELL_KNOWN_SID_TYPE integritySID;
+
+    if (integrityLevel == "UNTRUSTED")
+    {
+        integritySID = WinUntrustedLabelSid;
+
+    }
+    else if (integrityLevel == "LOW")
+    {
+        integritySID = WinLowLabelSid;
+    }
+    else if (integrityLevel == "MEDIUM")
+    {
+        integritySID = WinMediumLabelSid;
+    }
+    else if (integrityLevel == "HIGH")
+    {
+        integritySID = WinHighLabelSid;
+    }
+    else
+    {
+        std::cout << "UNKNOWN COMMAND!" << std::endl;
+        return;
+    }
+
+
+    TOKEN_MANDATORY_LABEL tml = { { (PSID)alloca(MAX_SID_SIZE), SE_GROUP_INTEGRITY } };
+
+    ULONG cb = MAX_SID_SIZE;
+
+    HANDLE hToken;
+
+    if (!CreateWellKnownSid(integritySID, 0, tml.Label.Sid, &cb) ||
+        !OpenProcessToken(hProcess, TOKEN_ADJUST_DEFAULT, &hToken))
+    {
+        std::cout << GetLastError();
+        return;
+    }
+
+    ULONG dwError = NOERROR;
+    if (!SetTokenInformation(hToken, TokenIntegrityLevel, &tml, sizeof(tml)))
+    {
+        std::cout << GetLastError();
+    }
+
+    CloseHandle(hToken);
+
+}
+
+int main(int argc, char* argv[]) {
+    SetConsoleCP(1251);
+    SetConsoleOutputCP(1251);
+   // nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
+    //WriteDataToJsonFile(jsonArray);
+    if (argc == 2 && std::string(argv[1]) == "--update")
+    {
+        nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
+        WriteDataToJsonFile(jsonArray);
+    }
+    if (argc == 4 && std::string(argv[1]) == "--setFileOwner") 
+    {
+        setFileOwner(argv[2], argv[3]);
+    }
+    else if (argc == 3 && std::string(argv[1]) == "--printFileOwner")
+    {
+        printFileOwner(argv[2]);
+    }
+    else if (argc == 5 && std::string(argv[1]) == "--setPrivilege")
+    {
+        HANDLE hProcess = OpenProcess(PROCESS_ALL_ACCESS, false, atoi(argv[2]));
+        if (hProcess == NULL)
+        {
+            printf("ACCESS DENIED\n");
+            return -1;
+        }
+
+        setPrivilege(hProcess, argv[3], argv[4][0] == '1');
+        //setPrivilege(argv[3], hProcess, argv[4][0]);
+
+        CloseHandle(hProcess);
+    }
+    else if (argc == 4 && std::string(argv[1]) == "--setFileIntegrityLevel") {
+        setFileIntegrityLevel(argv[2], argv[3]);
+    }
+    else if (argc == 4 && std::string(argv[1]) == "--setIntegrity")
+    {
+        setIntegrityLevel(atoi(argv[2]), std::string(argv[3]));
+    }
     return 0;
 }
