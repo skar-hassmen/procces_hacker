@@ -234,13 +234,13 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
         if (INVALID_HANDLE_VALUE != mSnapshot) {
             meModuleEntry.dwSize = sizeof(MODULEENTRY32);
             Module32First(mSnapshot, &meModuleEntry);
-            int Biba=0;
+            int Biba = 0;
             do {
                 if (wcscmp(meModuleEntry.szModule, L"mscoree.dll") == 0) isDotNet = TRUE;
                 std::wstring dll;
                 for (int i = 0; meModuleEntry.szModule[i] != 0x00; ++i) dll += meModuleEntry.szModule[i];
                 std::string dll_string = utf8_encode(dll);
-                if (Biba == 0) 
+                if (Biba == 0)
                 {
                     Biba = 1;
                 }
@@ -441,7 +441,7 @@ void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
 
     HANDLE hToken;
 
-    if (!CreateWellKnownSid(integritySID, 0, tml.Label.Sid, &cb) ||!OpenProcessToken(hProcess, TOKEN_ADJUST_DEFAULT, &hToken))
+    if (!CreateWellKnownSid(integritySID, 0, tml.Label.Sid, &cb) || !OpenProcessToken(hProcess, TOKEN_ADJUST_DEFAULT, &hToken))
     {
         std::cout << GetLastError();
         return;
@@ -501,14 +501,14 @@ void printFileIntegrityLevel(const char* path)
 int main(int argc, char* argv[]) {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
-   // nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
-    //WriteDataToJsonFile(jsonArray);
+    // nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
+     //WriteDataToJsonFile(jsonArray);
     if (argc == 2 && std::string(argv[1]) == "--update")
     {
         nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
         WriteDataToJsonFile(jsonArray);
     }
-    if (argc == 4 && std::string(argv[1]) == "--setFileOwner") 
+    if (argc == 4 && std::string(argv[1]) == "--setFileOwner")
     {
         setFileOwner(argv[2], argv[3]);
     }
