@@ -1,6 +1,9 @@
-PATH_FILE_JSON = "./../../data.json"
+# PATH_FILE_JSON = "./../../data.json"
+PATH_FILE_JSON = "./data.json"
 
-PATH_CONSOLE_PROGRAM = "./../../console/code/x64/Debug/code.exe"
+# PATH_CONSOLE_PROGRAM = "./../../console/code/x64/Debug/code.exe"
+PATH_CONSOLE_PROGRAM = "./code.exe"
+
 
 UPDATE_FLAG = "--update"
 SET_INTEGRITY_FLAG = "--setIntegrity"
@@ -22,7 +25,9 @@ NAMES_FOR_SERIALIZER_TABLE = [
         'description_process',
     ]
 
-PATH_MEDIA_FILES = "./../media"
+# PATH_MEDIA_FILES = "./../media"
+PATH_MEDIA_FILES = "./media"
+
 
 NAMES_ADDITIONAL_INFO = [
         'path_exe',
