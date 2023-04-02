@@ -53,3 +53,11 @@ def serialize_list_privileges(json_file, index):
         list_privileges.append(["No data", "No data"])
 
     return list_privileges
+
+
+def serialize_integrity_level(json_file, index):
+    integrity = json_file[index]['integrity']
+    if integrity != "":
+        return [integrity]
+    else:
+        return ["No data"]

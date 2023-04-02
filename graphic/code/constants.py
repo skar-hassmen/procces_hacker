@@ -2,6 +2,12 @@ PATH_FILE_JSON = "./../../data.json"
 
 PATH_CONSOLE_PROGRAM = "./../../console/code/x64/Debug/code.exe"
 
+UPDATE_FLAG = "--update"
+SET_INTEGRITY_FLAG = "--setIntegrity"
+SET_FILE_OWNER_FLAG = "--setFileOwner"
+PRINT_FILE_OWNER = "--printFileOwner"
+SET_PRIVILEGE_FLAG = "--setPrivilege "
+
 COLUMNS = ['Name', 'PID', 'PID parent', 'Owner User', 'Type', 'DEP', 'Execution\nenvironment',
            'Description']
 
@@ -29,11 +35,11 @@ NAMES_ADDITIONAL_INFO = [
 
 NAMES_ADDITIONAL_INFO_ROWS = [
         'Path exe:',
-        'SID',
+        'SID:',
         'Parent name:',
-        'ASLR\nEnableBottomUpRandomization',
-        'ASLR\nEnableForceRelocateImages',
-        'ASLR\nEnableHighEntropy'
+        'ASLR\nEnableBottomUpRandomization:',
+        'ASLR\nEnableForceRelocateImages:',
+        'ASLR\nEnableHighEntropy:'
 ]
 
 COLUMNS_ADDITIONAL_TABLE = [
@@ -46,4 +52,22 @@ COLUMN_DLL = ['List Dll']
 COLUMN_PRIVILEGES = [
         'Name Privilege',
         'On/Off'
+]
+
+COLUMN_INTEGRITY = [
+        "Level Integrity"
+]
+
+INTEGRITY_LEVELS = [
+        'LOW',
+        'MEDIUM',
+        'HIGH'
+]
+
+INCORRECT_INTEGRITY_LEVELS = [
+        'SYSTEM',
+        'UNTRUSTED',
+        'UNKNOWN',
+        'LOW',
+        'No data'
 ]

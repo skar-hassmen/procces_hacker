@@ -1,23 +1,104 @@
 import sys
+import time
+
 import pandas as pd
 
 from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtGui import QIcon
-from PyQt5.QtWidgets import QMainWindow, QApplication, QAction
+from PyQt5.QtWidgets import QMainWindow, QApplication, QAction, QComboBox, QPushButton, QMessageBox
 from PyQt5.QtCore import Qt
 
 from DataBase import DataBase
-from constants import COLUMNS, PATH_MEDIA_FILES, COLUMNS_ADDITIONAL_TABLE, COLUMN_DLL, COLUMN_PRIVILEGES
+from constants import COLUMNS, PATH_MEDIA_FILES, COLUMNS_ADDITIONAL_TABLE, COLUMN_DLL, COLUMN_PRIVILEGES, \
+    COLUMN_INTEGRITY, INTEGRITY_LEVELS, INCORRECT_INTEGRITY_LEVELS
 from serializers import serialize_data_for_table, serialize_additional_info, serialize_list_dlls, \
-    serialize_list_privileges
+    serialize_list_privileges, serialize_integrity_level
+
+
+class IntegrityWindow(QMainWindow):
+    def __init__(self, current_integrity):
+        super(IntegrityWindow, self).__init__()
+        self.current_integrity = current_integrity
+        self.setupUi()
+
+    def setupUi(self):
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.setWindowIcon(icon)
+        self.centralwidget = QtWidgets.QWidget(self)
+
+        self.integrity_chosen = QComboBox(self)
+        self.integrity_chosen.addItems(INTEGRITY_LEVELS)
+        self.integrity_chosen.setCurrentText(self.current_integrity)
+        self.integrity_chosen.move(50, 20)
+
+        button = QPushButton("Change", self)
+        button.move(50, 65)
+        button.clicked.connect(self.change_integrity_level)
+
+    def change_integrity_level(self):
+        new_integrity_level = self.integrity_chosen.currentText()
+        if new_integrity_level == self.current_integrity:
+            self.showDialog({
+                'icon': QMessageBox.Information,
+                'main_text': 'There were no changes. First change the setting and try again.',
+                'title_text': 'Information: There were no changes'
+            })
+        elif INTEGRITY_LEVELS.index(new_integrity_level) >= INTEGRITY_LEVELS.index(self.current_integrity):
+            self.showDialog({
+                'icon': QMessageBox.Critical,
+                'main_text': 'Unable to increase integrity level. Try to choose another integrity level !',
+                'title_text': 'Error: Unable to increase integrity level'
+            })
+        else:
+            db = DataBase()
+            db.change_integrity_level(db.json_array[db.current_index]['PID'], new_integrity_level)
+
+            self.showDialog({
+                'icon': QMessageBox.Information,
+                'main_text': 'The data has been successfully changed. Check the integrity level of this process !',
+                'title_text': 'Ok: The data has been successfully changed'
+            })
+            self.close()
+
+    def showDialog(self, params):
+        self.integity_msgBox = QMessageBox()
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.integity_msgBox.setWindowIcon(icon)
+        self.integity_msgBox.setIcon(params['icon'])
+        self.integity_msgBox.setText(params["main_text"])
+        self.integity_msgBox.setWindowTitle(params["title_text"])
+        self.integity_msgBox.setStandardButtons(QMessageBox.Ok)
+        self.integity_msgBox.show()
+
+
+class IntegrityTableView(QtWidgets.QTableView):
+
+    def mouseDoubleClickEvent(self, event):
+        index = self.currentIndex().siblingAtColumn(0)
+        current_integrity = index.data()
+
+        if current_integrity in INCORRECT_INTEGRITY_LEVELS:
+            self.showDialog()
+        else:
+            self.integrity_window = IntegrityWindow(current_integrity)
+            self.integrity_window.show()
+
+    def showDialog(self):
+        self.msgBox = QMessageBox()
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.msgBox.setWindowIcon(icon)
+        self.msgBox.setIcon(QMessageBox.Warning)
+        self.msgBox.setText("Changing the integrity level is not possible due to an incorrect value or a low integrity level")
+        self.msgBox.setWindowTitle("Warning: Changing is not possible!")
+        self.msgBox.setStandardButtons(QMessageBox.Ok)
+        self.msgBox.show()
 
 
 class AdditionalWindow(QMainWindow):
-    def __init__(self, name_process, json_file, index):
+    def __init__(self, name_process):
         super(AdditionalWindow, self).__init__()
         self.name_process = name_process
-        self.json_file = json_file
-        self.index = index
+        self.db = DataBase()
         self.setupUi()
 
     def setupUi(self):
@@ -38,6 +119,7 @@ class AdditionalWindow(QMainWindow):
         self.verticalLayout.setObjectName("verticalLayout")
 
         self.create_table_with_additional_info()
+        self.create_table_with_integrity()
         self.create_table_with_dlls()
         self.create_table_with_privileges()
 
@@ -54,10 +136,12 @@ class AdditionalWindow(QMainWindow):
             """
         )
 
-        additional_info = serialize_additional_info(self.json_file, self.index)
+        additional_info = serialize_additional_info(self.db.json_array, self.db.current_index)
         count_process = len(additional_info)
         data_table = pd.DataFrame(additional_info, columns=COLUMNS_ADDITIONAL_TABLE,
                                   index=[str(i) for i in range(1, count_process + 1)])
+
+        self.additional_table.setMinimumHeight(290)
 
         header_h = self.additional_table.horizontalHeader()
         header_h.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
@@ -80,7 +164,7 @@ class AdditionalWindow(QMainWindow):
             """
         )
 
-        dlls_info = serialize_list_dlls(self.json_file, self.index)
+        dlls_info = serialize_list_dlls(self.db.json_array, self.db.current_index)
         count_dll = len(dlls_info)
         data_table = pd.DataFrame(dlls_info, columns=COLUMN_DLL,
                                   index=[str(i) for i in range(1, count_dll + 1)])
@@ -97,6 +181,34 @@ class AdditionalWindow(QMainWindow):
         self.dlls_table.setObjectName("dlls_table")
         self.verticalLayout.addWidget(self.dlls_table)
 
+    def create_table_with_integrity(self):
+        self.integrity_table = IntegrityTableView()
+
+        self.integrity_table.setStyleSheet(
+            """
+            background-color: #ffdea1;
+            """
+        )
+
+        integrity_info = serialize_integrity_level(self.db.json_array, self.db.current_index)
+        count_integrity = 1
+        data_table = pd.DataFrame(integrity_info, columns=COLUMN_INTEGRITY,
+                                  index=[str("") for i in range(1, count_integrity + 1)])
+
+        self.integrity_table.setFixedHeight(60)
+
+        header_h = self.integrity_table.horizontalHeader()
+        header_h.setSectionResizeMode(QtWidgets.QHeaderView.Stretch)
+
+        header_v = self.integrity_table.verticalHeader()
+        header_v.setSectionResizeMode(QtWidgets.QHeaderView.ResizeToContents)
+
+        model_table = TableModel(data_table)
+        self.integrity_table.setModel(model_table)
+
+        self.integrity_table.setObjectName("integrity_table")
+        self.verticalLayout.addWidget(self.integrity_table)
+
     def create_table_with_privileges(self):
         self.privileges_table = QtWidgets.QTableView(self.verticalLayoutWidget)
 
@@ -106,7 +218,7 @@ class AdditionalWindow(QMainWindow):
             """
         )
 
-        privileges_info = serialize_list_privileges(self.json_file, self.index)
+        privileges_info = serialize_list_privileges(self.db.json_array, self.db.current_index)
         count_privileges = len(privileges_info)
         data_table = pd.DataFrame(privileges_info, columns=COLUMN_PRIVILEGES,
                                   index=[str(i) for i in range(1, count_privileges + 1)])
@@ -132,8 +244,10 @@ class MyTableView(QtWidgets.QTableView):
     def mouseDoubleClickEvent(self, event):
         index = self.currentIndex().siblingAtColumn(0)
         name_process = index.data()
+        db = DataBase()
+        db.set_index(index.row())
 
-        self.additional_window = AdditionalWindow(name_process, self.main_window.db.json_array, index.row())
+        self.additional_window = AdditionalWindow(name_process)
         self.additional_window.show()
 
 

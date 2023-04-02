@@ -70,6 +70,59 @@ std::vector<std::vector<std::string>> CheckPrivilege(HANDLE hProcess) {
 }
 
 
+std::wstring checkIntegrityLevel(HANDLE hProcess) {
+    std::wstring integrity;
+    HANDLE hProcessToken;
+    if (OpenProcessToken(hProcess, TOKEN_QUERY, &hProcessToken)) {
+        DWORD data_length = 0;
+        if (!GetTokenInformation(hProcessToken, TokenIntegrityLevel, NULL, 0, &data_length)) {
+            TOKEN_MANDATORY_LABEL* data = (TOKEN_MANDATORY_LABEL*)GlobalAlloc(GPTR, data_length);
+            if (GetTokenInformation(hProcessToken, TokenIntegrityLevel, data, data_length, &data_length)) {
+                SID* sid = static_cast<SID*>(data->Label.Sid);
+                DWORD rid = sid->SubAuthority[0];
+
+                switch (rid)
+                {
+                case SECURITY_MANDATORY_LOW_RID:
+                {
+                    integrity += L"LOW";
+                    break;
+                }
+                case SECURITY_MANDATORY_MEDIUM_RID:
+                {
+                    integrity += L"MEDIUM";
+                    break;
+                }
+                case SECURITY_MANDATORY_HIGH_RID:
+                {
+                    integrity += L"HIGH";
+                    break;
+                }
+                case SECURITY_MANDATORY_SYSTEM_RID:
+                {
+                    integrity += L"SYSTEM";
+                    break;
+                }
+                case SECURITY_MANDATORY_UNTRUSTED_RID:
+                {
+                    integrity += L"UNTRUSTED";
+                    break;
+                }
+                default:
+                {
+                    integrity += L"UNKNOWN";
+                    break;
+                }
+                }
+            }
+        }
+        CloseHandle(hProcessToken);
+    }
+
+    return integrity;
+}
+
+
 std::pair<std::wstring, std::wstring> checkSIDAndUsername(HANDLE hProcess) {
     std::wstring sid;
     std::wstring usrname;
@@ -212,6 +265,8 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
         jsonArray[indexArray]["SID"] = utf8_encode(SIDandNAME.first);
         jsonArray[indexArray]["name_owner_user"] = utf8_encode(SIDandNAME.second);
 
+        std::wstring integrity = checkIntegrityLevel(processHandle);
+        jsonArray[indexArray]["integrity"] = utf8_encode(integrity);
 
         jsonArray[indexArray]["privileges"] = CheckPrivilege(processHandle);
 
