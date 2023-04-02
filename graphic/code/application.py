@@ -1,6 +1,4 @@
 import sys
-import time
-
 import pandas as pd
 
 from PyQt5 import QtWidgets, QtCore
@@ -10,9 +8,72 @@ from PyQt5.QtCore import Qt
 
 from DataBase import DataBase
 from constants import COLUMNS, PATH_MEDIA_FILES, COLUMNS_ADDITIONAL_TABLE, COLUMN_DLL, COLUMN_PRIVILEGES, \
-    COLUMN_INTEGRITY, INTEGRITY_LEVELS, INCORRECT_INTEGRITY_LEVELS
+    COLUMN_INTEGRITY, INTEGRITY_LEVELS, INCORRECT_INTEGRITY_LEVELS, PRIVILEGES_CHOSEN, OWNER_CHOSEN
 from serializers import serialize_data_for_table, serialize_additional_info, serialize_list_dlls, \
     serialize_list_privileges, serialize_integrity_level
+
+
+class PrivilegesWindow(QMainWindow):
+    def __init__(self, current_privilege, current_privilege_status):
+        super(PrivilegesWindow, self).__init__()
+        self.current_privilege = current_privilege
+        self.current_privilege_status = current_privilege_status
+        self.setupUi()
+
+    def setupUi(self):
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.setWindowIcon(icon)
+        self.centralwidget = QtWidgets.QWidget(self)
+
+        self.privilege_chosen = QComboBox(self)
+        self.privilege_chosen.addItems(PRIVILEGES_CHOSEN)
+        self.privilege_chosen.setCurrentText(self.current_privilege_status)
+        self.privilege_chosen.move(50, 20)
+
+        button = QPushButton("Change", self)
+        button.move(50, 65)
+        button.clicked.connect(self.change_status_privilege)
+
+    def change_status_privilege(self):
+        new_privilege_status = self.privilege_chosen.currentText()
+        if new_privilege_status == self.current_privilege_status:
+            self.showDialog({
+                'icon': QMessageBox.Information,
+                'main_text': 'There were no changes. First change the setting and try again.',
+                'title_text': 'Information: There were no changes'
+            })
+        else:
+            db = DataBase()
+            db.change_status_privilege(db.json_array[db.current_index]['PID'], self.current_privilege, new_privilege_status)
+
+            self.showDialog({
+                'icon': QMessageBox.Information,
+                'main_text': 'The data has been successfully changed. Check the status privilege of this process !',
+                'title_text': 'Ok: The data has been successfully changed'
+            })
+            self.close()
+
+    def showDialog(self, params):
+        self.integity_msgBox = QMessageBox()
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.integity_msgBox.setWindowIcon(icon)
+        self.integity_msgBox.setIcon(params['icon'])
+        self.integity_msgBox.setText(params["main_text"])
+        self.integity_msgBox.setWindowTitle(params["title_text"])
+        self.integity_msgBox.setStandardButtons(QMessageBox.Ok)
+        self.integity_msgBox.show()
+
+
+class PrivilegesTableView(QtWidgets.QTableView):
+
+    def mouseDoubleClickEvent(self, event):
+        index1 = self.currentIndex().siblingAtColumn(0)
+        index2 = self.currentIndex().siblingAtColumn(1)
+        current_privilege = index1.data()
+        current_privilege_status = index2.data()
+
+        self.privilege_window = PrivilegesWindow(current_privilege, current_privilege_status)
+        self.privilege_window.show()
 
 
 class IntegrityWindow(QMainWindow):
@@ -99,13 +160,22 @@ class AdditionalWindow(QMainWindow):
         super(AdditionalWindow, self).__init__()
         self.name_process = name_process
         self.db = DataBase()
+        self.create_menu()
         self.setupUi()
+
+    def create_menu(self):
+        self.refresh_action = QAction(QIcon(f'{PATH_MEDIA_FILES}/refresh.png'), '&Refresh', self)
+        self.refresh_action.setShortcut('Ctrl+U')
+        self.refresh_action.triggered.connect(self.refresh_additional_table)
+
+        self.menu_bar = self.menuBar()
+        self.menu_bar.addAction(self.refresh_action)
 
     def setupUi(self):
         self.setWindowTitle(self.name_process)
         width = 700
-        height = 750
-        self.setGeometry(300, 250, width, height)
+        height = 800
+        self.setGeometry(300, 200, width, height)
         icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
         self.setWindowIcon(icon)
         self.setEnabled(True)
@@ -126,6 +196,10 @@ class AdditionalWindow(QMainWindow):
         self.setCentralWidget(self.centralwidget)
 
         QtCore.QMetaObject.connectSlotsByName(self)
+
+    def refresh_additional_table(self):
+        self.db.update_process_information()
+        self.setupUi()
 
     def create_table_with_additional_info(self):
         self.additional_table = QtWidgets.QTableView(self.verticalLayoutWidget)
@@ -210,7 +284,7 @@ class AdditionalWindow(QMainWindow):
         self.verticalLayout.addWidget(self.integrity_table)
 
     def create_table_with_privileges(self):
-        self.privileges_table = QtWidgets.QTableView(self.verticalLayoutWidget)
+        self.privileges_table = PrivilegesTableView()
 
         self.privileges_table.setStyleSheet(
             """
@@ -278,6 +352,106 @@ class TableModel(QtCore.QAbstractTableModel):
                 return str(self._data.index[section])
 
 
+class OwnerFileWindow(QMainWindow):
+    def __init__(self):
+        super(OwnerFileWindow, self).__init__()
+        self.setupUi()
+
+    def setupUi(self):
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.setWindowIcon(icon)
+        self.centralwidget = QtWidgets.QWidget(self)
+
+        self.path_file_owner = QtWidgets.QFileDialog.getOpenFileName()[0]
+        if len(self.path_file_owner) > 0:
+            self.owner_chosen = QComboBox(self)
+            self.owner_chosen.addItems(OWNER_CHOSEN)
+            self.owner_chosen.move(50, 20)
+
+            button = QPushButton("Change", self)
+            button.move(50, 65)
+            button.clicked.connect(self.change_owner_file)
+        else:
+            button = QPushButton("Exit", self)
+            button.move(50, 65)
+            button.clicked.connect(self.exit_window)
+
+    def exit_window(self):
+        self.close()
+
+    def change_owner_file(self):
+        new_owner_file = self.owner_chosen.currentText()
+        db = DataBase()
+        db.change_owner_file(self.path_file_owner, new_owner_file)
+
+        self.showDialog({
+            'icon': QMessageBox.Information,
+            'main_text': 'The data has been successfully changed. Check the owner of this file !',
+            'title_text': 'Ok: The data has been successfully changed'
+        })
+        self.close()
+
+    def showDialog(self, params):
+        self.integity_msgBox = QMessageBox()
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.integity_msgBox.setWindowIcon(icon)
+        self.integity_msgBox.setIcon(params['icon'])
+        self.integity_msgBox.setText(params["main_text"])
+        self.integity_msgBox.setWindowTitle(params["title_text"])
+        self.integity_msgBox.setStandardButtons(QMessageBox.Ok)
+        self.integity_msgBox.show()
+
+
+class IntegrityFileWindow(QMainWindow):
+    def __init__(self):
+        super(IntegrityFileWindow, self).__init__()
+        self.setupUi()
+
+    def setupUi(self):
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.setWindowIcon(icon)
+        self.centralwidget = QtWidgets.QWidget(self)
+
+        self.path_file = QtWidgets.QFileDialog.getOpenFileName()[0]
+        if len(self.path_file) > 0:
+            self.integrity_chosen = QComboBox(self)
+            self.integrity_chosen.addItems(INTEGRITY_LEVELS)
+            self.integrity_chosen.move(50, 20)
+
+            button = QPushButton("Change", self)
+            button.move(50, 65)
+            button.clicked.connect(self.change_integrity_level)
+        else:
+            button = QPushButton("Exit", self)
+            button.move(50, 65)
+            button.clicked.connect(self.exit_window)
+
+    def exit_window(self):
+        self.close()
+
+    def change_integrity_level(self):
+        new_integrity_level = self.integrity_chosen.currentText()
+        db = DataBase()
+        db.change_integrity_level_file(self.path_file, new_integrity_level)
+
+        self.showDialog({
+            'icon': QMessageBox.Information,
+            'main_text': 'The data has been successfully changed. Check the integrity level of this file !',
+            'title_text': 'Ok: The data has been successfully changed'
+        })
+        self.close()
+
+    def showDialog(self, params):
+        self.integity_msgBox = QMessageBox()
+        icon = QIcon(f'{PATH_MEDIA_FILES}/info.png')
+        self.integity_msgBox.setWindowIcon(icon)
+        self.integity_msgBox.setIcon(params['icon'])
+        self.integity_msgBox.setText(params["main_text"])
+        self.integity_msgBox.setWindowTitle(params["title_text"])
+        self.integity_msgBox.setStandardButtons(QMessageBox.Ok)
+        self.integity_msgBox.show()
+
+
 class Window(QMainWindow):
     def __init__(self):
         super(Window, self).__init__()
@@ -322,18 +496,28 @@ class Window(QMainWindow):
         file_owner_action.setShortcut('Ctrl+O')
         file_owner_action.triggered.connect(self.change_file_owner)
 
+        file_integrity_action = QAction('&Сhange File Integrity', self)
+        file_integrity_action.setShortcut('Ctrl+I')
+        file_integrity_action.triggered.connect(self.change_file_integrity)
+
         menu_bar = self.menuBar()
         menu_bar.addAction(refresh_action)
 
         action_menu = menu_bar.addMenu("&Action")
         action_menu.addAction(file_owner_action)
+        action_menu.addAction(file_integrity_action)
 
     def refresh_table(self):
         self.db.update_process_information()
         self.create_table()
 
     def change_file_owner(self):
-        print("777")
+        self.owner_file_window = OwnerFileWindow()
+        self.owner_file_window.show()
+
+    def change_file_integrity(self):
+        self.integrity_file_window = IntegrityFileWindow()
+        self.integrity_file_window.show()
 
 
 def application():

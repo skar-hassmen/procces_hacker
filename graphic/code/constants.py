@@ -5,8 +5,8 @@ PATH_CONSOLE_PROGRAM = "./../../console/code/x64/Debug/code.exe"
 UPDATE_FLAG = "--update"
 SET_INTEGRITY_FLAG = "--setIntegrity"
 SET_FILE_OWNER_FLAG = "--setFileOwner"
-PRINT_FILE_OWNER = "--printFileOwner"
-SET_PRIVILEGE_FLAG = "--setPrivilege "
+SET_PRIVILEGE_FLAG = "--setPrivilege"
+SET_INTEGRITY_FILE_FLAG = "--setFileIntegrityLevel"
 
 COLUMNS = ['Name', 'PID', 'PID parent', 'Owner User', 'Type', 'DEP', 'Execution\nenvironment',
            'Description']
@@ -51,7 +51,7 @@ COLUMN_DLL = ['List Dll']
 
 COLUMN_PRIVILEGES = [
         'Name Privilege',
-        'On/Off'
+        'Enable/Disable'
 ]
 
 COLUMN_INTEGRITY = [
@@ -71,3 +71,24 @@ INCORRECT_INTEGRITY_LEVELS = [
         'LOW',
         'No data'
 ]
+
+
+STATUS_PRIVILEGES = {
+        '0': 'Disable',
+        '1': 'Enable',
+        '2': 'Enable',
+        '3': 'Enable',
+        'Enable': '1',
+        'Disable': '0'
+}
+
+PRIVILEGES_CHOSEN = [
+        'Enable',
+        'Disable'
+]
+
+OWNER_CHOSEN = [
+        'OWNER',
+        'CURRENT'
+]
+

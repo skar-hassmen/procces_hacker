@@ -1,4 +1,4 @@
-from constants import NAMES_FOR_SERIALIZER_TABLE, NAMES_ADDITIONAL_INFO, NAMES_ADDITIONAL_INFO_ROWS
+from constants import NAMES_FOR_SERIALIZER_TABLE, NAMES_ADDITIONAL_INFO, NAMES_ADDITIONAL_INFO_ROWS, STATUS_PRIVILEGES
 
 
 def serialize_data_for_table(json_file):
@@ -48,7 +48,7 @@ def serialize_list_privileges(json_file, index):
     list_privileges = []
     if len(json_file[index]['privileges']) > 0:
         for elem in json_file[index]['privileges']:
-            list_privileges.append([elem, 'None'])
+            list_privileges.append([elem[0], STATUS_PRIVILEGES[elem[1]]])
     else:
         list_privileges.append(["No data", "No data"])
 
