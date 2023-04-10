@@ -394,19 +394,17 @@ void printFileOwner(const char* path)
 
 void setFileOwner(const char* path, const char* user)
 {
-    char cmd[256] = { 0 };
-    strcat(cmd, "takeown /F \"");
-    strcat(cmd, path);
-    strcat(cmd, "\"");
+    std::string command = "takeown /f " + std::string(path) + " ";
+
 
 
     if (!strcmp(user, "OWNER")) {
-        strcat(cmd, " /A");
-        system(cmd);
+        command += "/a";
+        system(command.c_str());
     }
     else if (!strcmp(user, "CURRENT"))
     {
-        system(cmd);
+        system(command.c_str());
     }
     else
     {
@@ -516,6 +514,9 @@ void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
 int main(int argc, char* argv[]) {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
+    //setFileOwner("C:\\Users\\Usver\\Desktop\\tqwe.txt", "OWNER");
+
+    //return 0;
    // nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
     //WriteDataToJsonFile(jsonArray);
     if (argc == 2 && std::string(argv[1]) == "--update")

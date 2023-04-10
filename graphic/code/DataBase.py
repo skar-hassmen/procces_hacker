@@ -1,5 +1,3 @@
-import sys
-
 from constants import PATH_CONSOLE_PROGRAM, PATH_FILE_JSON, UPDATE_FLAG, SET_INTEGRITY_FLAG, SET_PRIVILEGE_FLAG, \
     STATUS_PRIVILEGES, SET_INTEGRITY_FILE_FLAG, SET_FILE_OWNER_FLAG
 import subprocess
@@ -35,5 +33,6 @@ class DataBase:
         subprocess.Popen(f'{PATH_CONSOLE_PROGRAM} {SET_INTEGRITY_FILE_FLAG} {path} {level}')
 
     def change_owner_file(self, path, owner):
-        subprocess.Popen(f'{PATH_CONSOLE_PROGRAM} {SET_FILE_OWNER_FLAG} {path} {owner}')
+        subprocess.Popen(f'icacls "{path}" /setowner {owner}')
+        # subprocess.Popen(f'{PATH_CONSOLE_PROGRAM} {SET_FILE_OWNER_FLAG} {path} {owner}')
 
