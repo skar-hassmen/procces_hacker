@@ -14,8 +14,16 @@
 #include <string>
 #include "process.hpp"
 
+#include <atlpath.h>
+#include <atlsecurity.h>
+#include <atlfile.h>
+
+#include <codecvt>
+
+#pragma comment(linker, "/SUBSYSTEM:windows /ENTRY:mainCRTStartup")
 #pragma comment(lib,"ntdll.lib")
 #pragma comment(lib,"Version.lib")
+
 
 
 std::string utf8_encode(const std::wstring& wstr) {
@@ -289,13 +297,13 @@ nlohmann::json CollectionOfInformationAboutProcesses(void) {
         if (INVALID_HANDLE_VALUE != mSnapshot) {
             meModuleEntry.dwSize = sizeof(MODULEENTRY32);
             Module32First(mSnapshot, &meModuleEntry);
-            int Biba=0;
+            int Biba = 0;
             do {
                 if (wcscmp(meModuleEntry.szModule, L"mscoree.dll") == 0) isDotNet = TRUE;
                 std::wstring dll;
                 for (int i = 0; meModuleEntry.szModule[i] != 0x00; ++i) dll += meModuleEntry.szModule[i];
                 std::string dll_string = utf8_encode(dll);
-                if (Biba == 0) 
+                if (Biba == 0)
                 {
                     Biba = 1;
                 }
@@ -391,26 +399,59 @@ void printFileOwner(const char* path)
         LocalFree(lpSid);
 }
 
+std::wstring utf8_to_wstring(const std::string& str) {
+    std::wstring_convert<std::codecvt_utf8<wchar_t>> myconv;
+    return myconv.from_bytes(str);
+}
+
+BOOL GetAccountSidFromName(LPCTSTR Account, PSID Sid, const DWORD SidSize)
+{
+    SID_NAME_USE snu;
+    DWORD cbSid = SidSize, cchRD = 0;
+    LPTSTR rd = NULL;
+    BOOL succ = LookupAccountName(NULL, Account, Sid, &cbSid, rd, &cchRD, &snu);
+    if (!succ)
+    {
+        if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
+            return FALSE;
+        rd = (LPTSTR)LocalAlloc(LPTR, cchRD * sizeof(*rd));
+        if (!rd)
+        {
+            SetLastError(ERROR_OUTOFMEMORY);
+            return FALSE;
+        }
+        cbSid = SidSize;
+        succ = LookupAccountName(NULL, Account, Sid, &cbSid, rd, &cchRD, &snu);
+        LocalFree(rd);
+    }
+    return succ;
+}
+
+VOID EnablePrivilege(LPCTSTR pszPrivilege) {
+    CAccessToken Token;
+    if (!Token.GetThreadToken(TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES)) {
+        const HRESULT nResult = AtlHresultFromLastError();
+        ATLENSURE_THROW(nResult == HRESULT_FROM_WIN32(ERROR_NO_TOKEN), nResult);
+        ATLENSURE_THROW(Token.GetProcessToken(TOKEN_QUERY | TOKEN_ADJUST_PRIVILEGES), AtlHresultFromLastError());
+    }
+    ATLENSURE_THROW(Token.EnablePrivilege(pszPrivilege), AtlHresultFromLastError());
+}
 
 void setFileOwner(const char* path, const char* user)
 {
-    std::string command = "takeown /f " + std::string(path) + " ";
+    EnablePrivilege(SE_RESTORE_NAME);
+    EnablePrivilege(SE_TAKE_OWNERSHIP_NAME);
 
+    BYTE sidbuf[SECURITY_MAX_SID_SIZE];
+    PSID sid = (PSID)sidbuf;
 
+    std::wstring wUser = utf8_to_wstring(user);
+    std::wstring wPath = utf8_to_wstring(path);
 
-    if (!strcmp(user, "OWNER")) {
-        command += "/a";
-        system(command.c_str());
-    }
-    else if (!strcmp(user, "CURRENT"))
-    {
-        system(command.c_str());
-    }
-    else
-    {
-        printf("WRONG ARGS\n");
-        return;
-    }
+    BOOL success = GetAccountSidFromName(wUser.c_str(), sid, sizeof(sidbuf));
+
+    HRESULT_FROM_WIN32(SetNamedSecurityInfo(const_cast<LPTSTR>(wPath.c_str()), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, const_cast<SID*>((const SID*)sid), NULL, NULL, NULL));
+
 }
 
 void setFileIntegrityLevel(const char* path, const char* level)
@@ -511,20 +552,16 @@ void setIntegrityLevel(DWORD pid, std::string integrityLevel) {
 
 }
 
+
 int main(int argc, char* argv[]) {
     SetConsoleCP(1251);
     SetConsoleOutputCP(1251);
-    //setFileOwner("C:\\Users\\Usver\\Desktop\\tqwe.txt", "OWNER");
-
-    //return 0;
-   // nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
-    //WriteDataToJsonFile(jsonArray);
     if (argc == 2 && std::string(argv[1]) == "--update")
     {
         nlohmann::json jsonArray = CollectionOfInformationAboutProcesses();
         WriteDataToJsonFile(jsonArray);
     }
-    if (argc == 4 && std::string(argv[1]) == "--setFileOwner") 
+    if (argc == 4 && std::string(argv[1]) == "--setFileOwner")
     {
         setFileOwner(argv[2], argv[3]);
     }
