@@ -1,7 +1,7 @@
 PATH_FILE_JSON = "./../../data.json"
 # PATH_FILE_JSON = "./data.json"
 
-PATH_CONSOLE_PROGRAM = "./../../console/code/x64/Release/code.exe"
+PATH_CONSOLE_PROGRAM = "./../../console/code/x64/Debug/code.exe"
 # PATH_CONSOLE_PROGRAM = "./code.exe"
 
 
@@ -93,9 +93,9 @@ PRIVILEGES_CHOSEN = [
 ]
 
 OWNER_CHOSEN = [
-        'Система',
-        'Администратор',
-        'Usver',
-        'Test'
+        'System',
+        'mbks',
+        'Test',
+        'Usver'
 ]
 

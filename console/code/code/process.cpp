@@ -442,7 +442,7 @@ void setFileOwner(const char* path, const char* user)
     EnablePrivilege(SE_RESTORE_NAME);
     EnablePrivilege(SE_TAKE_OWNERSHIP_NAME);
 
-    BYTE sidbuf[SECURITY_MAX_SID_SIZE];
+    BYTE sidbuf[150];
     PSID sid = (PSID)sidbuf;
 
     std::wstring wUser = utf8_to_wstring(user);
@@ -451,7 +451,6 @@ void setFileOwner(const char* path, const char* user)
     BOOL success = GetAccountSidFromName(wUser.c_str(), sid, sizeof(sidbuf));
 
     HRESULT_FROM_WIN32(SetNamedSecurityInfo(const_cast<LPTSTR>(wPath.c_str()), SE_FILE_OBJECT, OWNER_SECURITY_INFORMATION, const_cast<SID*>((const SID*)sid), NULL, NULL, NULL));
-
 }
 
 void setFileIntegrityLevel(const char* path, const char* level)
@@ -579,7 +578,6 @@ int main(int argc, char* argv[]) {
         }
 
         setPrivilege(hProcess, argv[3], argv[4][0] == '1');
-        //setPrivilege(argv[3], hProcess, argv[4][0]);
 
         CloseHandle(hProcess);
     }
